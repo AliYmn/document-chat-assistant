@@ -41,7 +41,6 @@ repos:
     hooks:
       - id: conventional-commits-check
         stages: [commit-msg]
-        args: ["--emoji-disabled"]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.11.12
