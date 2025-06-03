@@ -21,6 +21,14 @@ class Config(BaseSettings):
     POSTGRES_USER: str
     POSTGRES_PORT: int
 
+    # MONGODB
+    MONGO_USER: str
+    MONGO_PASSWORD: str
+    MONGO_DB: str
+    MONGO_HOST: str
+    MONGO_PORT: int
+    MONGO_URI: str
+
     # RabbitMQ
     RABBITMQ_PASS: str
     RABBITMQ_USER: str

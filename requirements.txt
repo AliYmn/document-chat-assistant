@@ -26,3 +26,8 @@ fastapi-limiter==0.1.6
 openai==1.84.0
 boto3==1.38.29
 sentry-sdk==2.29.1
+mongodb==4.6.3
+motor==3.4.0
+pymongo==4.6.3
+# PDF Processing
+PyPDF2>=3.0.0
