@@ -103,7 +103,7 @@ async def http_exception_handler(_request, exc: ExceptionBase) -> ORJSONResponse
     logger.error(
         "Exception occurred",
         status_code=exc.status_code,
-        error_code=exc.error_code,
+        error_code=exc.code,
         message=exc.message,
     )
     return ORJSONResponse(
