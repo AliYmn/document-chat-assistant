@@ -1,11 +1,13 @@
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, Any, List
 
 import aiohttp
-from fastapi import HTTPException, status
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from libs.exceptions.schemas import ExceptionBase
+from libs.exceptions.errors import ErrorCode
+from libs.logger import get_logger
 from libs.settings import settings
 from libs.models.chat import ChatMessage
 
@@ -23,6 +25,7 @@ class AIService:
         self.api_key = settings.GEMINI_API_KEY
         self.base_url = "https://generativelanguage.googleapis.com/v1beta"
         self.model = "gemini-2.0-flash"
+        self.logger = get_logger("ai_service")
 
     async def chat_with_pdf(self, user_id: int, message: str, pdf_content: str, pdf_title: str) -> Dict[str, Any]:
         """Send a message to Gemini API with PDF context and get a response
@@ -59,11 +62,9 @@ class AIService:
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload, headers={"Content-Type": "application/json"}) as response:
                     if response.status != 200:
-                        error_text = await response.text()
-                        raise HTTPException(
-                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f"Error from Gemini API: {error_text}",
-                        )
+                        self.logger.error("Error from Gemini API", status=response.status)
+                        await response.text()  # Consume response body
+                        raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR)
 
                     response_data = await response.json()
                     ai_response = (
@@ -74,10 +75,7 @@ class AIService:
                     )
 
                     if not ai_response:
-                        raise HTTPException(
-                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail="Failed to get a valid response from Gemini API",
-                        )
+                        raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR)
 
             # Save user message to database
             user_chat_message = ChatMessage(user_id=user_id, message=message, is_user=True, timestamp=datetime.now())
@@ -91,12 +89,9 @@ class AIService:
 
             return {"message": message, "response": ai_response, "pdf_title": pdf_title}
 
-        except HTTPException as e:
-            raise e
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error processing chat request: {str(e)}"
-            )
+        except Exception:
+            self.logger.error("Error in chat_with_pdf")
+            raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR)
 
     async def get_chat_history(self, user_id: int, limit: int = 50) -> List[Dict[str, Any]]:
         """Get chat history for a user
@@ -132,7 +127,5 @@ class AIService:
 
             return history
 
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error retrieving chat history: {str(e)}"
-            )
+        except Exception:
+            raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR)

@@ -4,13 +4,15 @@ from typing import List, Dict, Any
 
 from bson import ObjectId
 import PyPDF2
-from fastapi import UploadFile, HTTPException, status
+from fastapi import UploadFile
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from libs.db.mongodb import get_async_mongodb
 from libs.logger import get_logger
 from pdf_service.api.v1.pdf.pdf_schemas import PDFUploadMetadata, PDFMetadataResponse
+from libs.exceptions.schemas import ExceptionBase
+from libs.exceptions.errors import ErrorCode
 
 
 class PDFService:
@@ -93,10 +95,11 @@ class PDFService:
                 "upload_date": datetime.utcnow(),
                 "parsed": False,
                 "text_content": None,
+                "content_type": metadata.content_type,
             }
         except Exception as e:
             self.logger.error("Failed to upload file to GridFS", error=str(e))
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to upload PDF file")
+            raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR)
 
         # Insert metadata into the pdf_metadata collection
         metadata_collection = mongodb["pdf_metadata"]
@@ -122,7 +125,7 @@ class PDFService:
             Metadata of the PDF document
 
         Raises:
-            HTTPException: If the document is not found or doesn't belong to the user
+            ExceptionBase: If the document is not found or doesn't belong to the user
         """
         self.logger.info("Getting PDF metadata", document_id=document_id, user_id=user_id)
 
@@ -133,7 +136,7 @@ class PDFService:
             # Convert string ID to ObjectId
             obj_id = ObjectId(document_id)
         except Exception:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid document ID format")
+            raise ExceptionBase(ErrorCode.BAD_REQUEST)
 
         # Find document with matching ID and user_id
         metadata_collection = mongodb["pdf_metadata"]
@@ -142,10 +145,7 @@ class PDFService:
         # Check if document exists
         if not document:
             self.logger.warning("PDF document not found", document_id=document_id)
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="PDF document not found",
-            )
+            raise ExceptionBase(ErrorCode.NOT_FOUND)
 
         # Check if document belongs to the user
         if document["user_id"] != user_id:
@@ -155,13 +155,16 @@ class PDFService:
                 requested_by_user_id=user_id,
                 owner_user_id=document["user_id"],
             )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to access this document",
-            )
+            raise ExceptionBase(ErrorCode.FORBIDDEN)
 
         # Convert ObjectId to string for response
         document["id"] = str(document.pop("_id"))
+
+        # Ensure required fields exist
+        if "content_type" not in document:
+            document["content_type"] = "application/pdf"
+        if "filename" not in document:
+            document["filename"] = f"{document['title']}.pdf"
 
         return PDFMetadataResponse(**document)
 
@@ -192,6 +195,13 @@ class PDFService:
         async for doc in cursor:
             # Convert ObjectId to string for response
             doc["id"] = str(doc.pop("_id"))
+
+            # Ensure required fields exist
+            if "content_type" not in doc:
+                doc["content_type"] = "application/pdf"
+            if "filename" not in doc:
+                doc["filename"] = f"{doc['title']}.pdf"
+
             documents.append(PDFMetadataResponse(**doc))
 
         return documents
@@ -208,7 +218,7 @@ class PDFService:
             True if the document was deleted successfully
 
         Raises:
-            HTTPException: If the document is not found or doesn't belong to the user
+            ExceptionBase: If the document is not found or doesn't belong to the user
         """
         self.logger.info("Deleting PDF document", document_id=document_id, user_id=user_id)
 
@@ -219,14 +229,14 @@ class PDFService:
             # Convert string ID to ObjectId
             obj_id = ObjectId(document_id)
         except Exception:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid document ID format")
+            raise ExceptionBase(ErrorCode.BAD_REQUEST)
 
         # Find document with matching ID and user_id
         metadata_collection = mongodb["pdf_metadata"]
         document = await metadata_collection.find_one({"_id": obj_id, "user_id": user_id})
 
         if not document:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+            raise ExceptionBase(ErrorCode.NOT_FOUND)
 
         # Create GridFS bucket
         fs = AsyncIOMotorGridFSBucket(mongodb)
@@ -248,9 +258,7 @@ class PDFService:
 
         except Exception as e:
             self.logger.error("Error deleting PDF document", document_id=document_id, error=str(e))
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete PDF document"
-            )
+            raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR)
 
     async def parse_pdf_text(self, document_id: str, user_id: int) -> bool:
         """
@@ -264,7 +272,7 @@ class PDFService:
             True if the document was parsed successfully
 
         Raises:
-            HTTPException: If the document is not found or doesn't belong to the user
+            ExceptionBase: If the document is not found or doesn't belong to the user
         """
         self.logger.info("Parsing PDF text", document_id=document_id, user_id=user_id)
 
@@ -276,13 +284,13 @@ class PDFService:
             # Convert string ID to ObjectId
             obj_id = ObjectId(document_id)
         except Exception:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid document ID format")
+            raise ExceptionBase(ErrorCode.BAD_REQUEST)
 
         # Find document with matching ID and user_id
         document = await metadata_collection.find_one({"_id": obj_id, "user_id": user_id})
 
         if not document:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+            raise ExceptionBase(ErrorCode.NOT_FOUND)
 
         # Get GridFS bucket
         fs = AsyncIOMotorGridFSBucket(mongodb)
@@ -305,10 +313,8 @@ class PDFService:
             if "page_count" not in document or not document["page_count"]:
                 await metadata_collection.update_one({"_id": obj_id}, {"$set": {"page_count": num_pages}})
 
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error parsing PDF: {str(e)}"
-            )
+        except Exception:
+            raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR)
 
         return {"document_id": document_id, "title": document["title"], "page_count": num_pages, "content": pdf_content}
 
@@ -369,7 +375,7 @@ class PDFService:
         try:
             document = await self.get_pdf_metadata(user_pref["active_pdf_id"], user_id)
             return {"document_id": user_pref["active_pdf_id"], "title": document.title}
-        except HTTPException:
+        except ExceptionBase:
             # If the PDF no longer exists, clear the selection
             await user_prefs.update_one({"user_id": user_id}, {"$unset": {"active_pdf_id": "", "active_pdf_title": ""}})
             return None
@@ -396,7 +402,7 @@ class PDFService:
             try:
                 parse_result = await self.parse_pdf_text(document_id, user_id)
                 return parse_result.get("content", "")
-            except HTTPException:
+            except Exception:
                 return ""
 
         return text_doc["content"]
