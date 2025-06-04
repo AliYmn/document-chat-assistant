@@ -23,8 +23,8 @@ class AIService:
         """
         self.db = db
         self.api_key = settings.GEMINI_API_KEY
-        self.base_url = "https://generativelanguage.googleapis.com/v1beta"
-        self.model = "gemini-2.0-flash"
+        self.base_url = settings.GEMINI_API_URL
+        self.model = settings.GEMINI_MODEL
         self.logger = get_logger("ai_service")
 
     async def chat_with_pdf(self, user_id: int, message: str, pdf_content: str, pdf_title: str) -> Dict[str, Any]:
@@ -89,8 +89,14 @@ class AIService:
 
             return {"message": message, "response": ai_response, "pdf_title": pdf_title}
 
-        except Exception:
-            self.logger.error("Error in chat_with_pdf")
+        except aiohttp.ClientError as e:
+            self.logger.error(f"Gemini API connection error: {str(e)}")
+            raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR, message="Failed to connect to AI service")
+        except ExceptionBase:
+            # Re-raise existing ExceptionBase exceptions
+            raise
+        except Exception as e:
+            self.logger.error(f"Error in chat_with_pdf: {str(e)}")
             raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR)
 
     async def get_chat_history(self, user_id: int, limit: int = 50) -> List[Dict[str, Any]]:
@@ -127,5 +133,6 @@ class AIService:
 
             return history
 
-        except Exception:
-            raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            self.logger.error(f"Error retrieving chat history: {str(e)}")
+            raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR, message="Failed to retrieve chat history")

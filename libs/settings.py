@@ -35,6 +35,11 @@ class Config(BaseSettings):
     RABBITMQ_HOST: str
     RABBITMQ_PORT: int
 
+    # Gemini AI API
+    GEMINI_API_KEY: str
+    GEMINI_API_URL: str = "https://generativelanguage.googleapis.com/v1beta"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
     # REDIS
     REDIS_PORT: int
     REDIS_HOST: str

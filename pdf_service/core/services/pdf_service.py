@@ -307,13 +307,30 @@ class PDFService:
 
             for page_num in range(num_pages):
                 page = pdf_reader.pages[page_num]
-                pdf_content += page.extract_text() + "\n"
+                try:
+                    page_text = page.extract_text()
+                    if page_text:
+                        pdf_content += page_text + "\n"
+                    else:
+                        self.logger.warning(f"Empty text extracted from page {page_num + 1}")
+                except Exception as e:
+                    self.logger.error(f"Error extracting text from page {page_num + 1}: {str(e)}")
+                    # Continue with next page instead of failing completely
 
             # Update metadata with page count if not already set
             if "page_count" not in document or not document["page_count"]:
                 await metadata_collection.update_one({"_id": obj_id}, {"$set": {"page_count": num_pages}})
 
-        except Exception:
+            # Save the extracted text to the pdf_texts collection
+            pdf_texts = mongodb["pdf_texts"]
+            await pdf_texts.update_one(
+                {"document_id": document_id, "user_id": user_id},
+                {"$set": {"content": pdf_content, "parsed_date": datetime.utcnow()}},
+                upsert=True,
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error parsing PDF: {str(e)}")
             raise ExceptionBase(ErrorCode.INTERNAL_SERVER_ERROR)
 
         return {"document_id": document_id, "title": document["title"], "page_count": num_pages, "content": pdf_content}
