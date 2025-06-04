@@ -21,28 +21,39 @@ def configure_logging(service_name: str, log_level: str = "INFO") -> None:
     # Set log level
     log_level_value = getattr(logging, log_level.upper())
 
-    # Configure structlog
+    # Configure structlog based on environment
+    processors = [
+        # Add log level name
+        structlog.stdlib.add_log_level,
+        # Add timestamp
+        structlog.processors.TimeStamper(fmt="iso"),
+        # Add caller info (file, line number)
+        structlog.processors.CallsiteParameterAdder(
+            parameters={
+                structlog.processors.CallsiteParameter.PATHNAME,
+                structlog.processors.CallsiteParameter.LINENO,
+                structlog.processors.CallsiteParameter.FUNC_NAME,
+            }
+        ),
+        # Add service name
+        structlog.processors.StackInfoRenderer(),
+    ]
+
+    # Add environment-specific processors
+    if settings.ENV_NAME == "development":
+        # Development: Use rich console output for better readability
+        processors.extend(
+            [
+                structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+                structlog.dev.ConsoleRenderer(colors=True, exception_formatter=structlog.dev.plain_traceback),
+            ]
+        )
+    else:
+        # Production: Use JSON output
+        processors.append(structlog.processors.JSONRenderer())
+
     structlog.configure(
-        processors=[
-            # Add log level name
-            structlog.stdlib.add_log_level,
-            # Add timestamp
-            structlog.processors.TimeStamper(fmt="iso"),
-            # Add caller info (file, line number)
-            structlog.processors.CallsiteParameterAdder(
-                parameters={
-                    structlog.processors.CallsiteParameter.PATHNAME,
-                    structlog.processors.CallsiteParameter.LINENO,
-                    structlog.processors.CallsiteParameter.FUNC_NAME,
-                }
-            ),
-            # Add service name
-            structlog.processors.StackInfoRenderer(),
-            # If in development, format logs for console readability
-            structlog.dev.ConsoleRenderer()
-            if settings.ENV_NAME == "development"
-            else structlog.processors.JSONRenderer(),
-        ],
+        processors=processors,
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,
@@ -54,8 +65,18 @@ def configure_logging(service_name: str, log_level: str = "INFO") -> None:
 
     # Console handler with rich formatting for development
     if settings.ENV_NAME == "development":
+        # Enhanced development logging with Rich
         console = Console(width=120)
-        handlers.append(RichHandler(console=console, rich_tracebacks=True, tracebacks_show_locals=True))
+        rich_handler = RichHandler(
+            console=console,
+            rich_tracebacks=True,
+            tracebacks_show_locals=True,
+            markup=True,
+            show_time=True,
+            omit_repeated_times=False,
+            log_time_format="[%X]",
+        )
+        handlers.append(rich_handler)
     else:
         # JSON handler for production
         json_handler = logging.StreamHandler(sys.stdout)
