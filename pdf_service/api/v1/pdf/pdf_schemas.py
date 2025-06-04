@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 
@@ -13,7 +13,7 @@ class PDFUploadMetadata(BaseModel):
     content_type: str = Field("application/pdf", description="Content type of the file")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "title": "Sample Document",
                 "description": "A sample PDF document",
@@ -36,3 +36,35 @@ class PDFMetadataResponse(BaseModel):
     file_size: int = Field(..., description="Size of the file in bytes")
     upload_date: datetime = Field(..., description="Upload timestamp")
     content_type: str = Field(..., description="Content type of the file")
+
+
+class ChatRequest(BaseModel):
+    """Request model for chat with PDF"""
+
+    message: str = Field(..., description="User message to send to the AI")
+
+    class Config:
+        json_schema_extra = {"example": {"message": "What is this document about?"}}
+
+
+class ChatResponse(BaseModel):
+    """Response model for chat with PDF"""
+
+    message: str = Field(..., description="User's original message")
+    response: str = Field(..., description="AI response to the user's message")
+    pdf_title: str = Field(..., description="Title of the PDF document being discussed")
+
+
+class ChatMessageResponse(BaseModel):
+    """Model for a single chat message in history"""
+
+    id: str = Field(..., description="Message ID")
+    message: str = Field(..., description="Message content")
+    is_user: bool = Field(..., description="Whether the message is from the user (True) or AI (False)")
+    timestamp: str = Field(..., description="Message timestamp in ISO format")
+
+
+class ChatHistoryResponse(BaseModel):
+    """Response model for chat history"""
+
+    history: List[Dict[str, Any]] = Field(..., description="List of chat messages")

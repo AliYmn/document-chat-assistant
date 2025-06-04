@@ -278,3 +278,58 @@ class PDFService:
         )
 
         return {"status": "success", "message": f"PDF '{document.title}' selected for chat", "document_id": document_id}
+
+    async def get_selected_pdf(self, user_id: int) -> Dict[str, Any]:
+        """
+        Get the currently selected PDF for a user
+
+        Args:
+            user_id: ID of the user
+
+        Returns:
+            Dictionary with selected PDF details or None if no PDF is selected
+        """
+        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
+        mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
+        user_prefs = mongodb["user_preferences"]
+
+        # Get user preference for active PDF
+        user_pref = await user_prefs.find_one({"user_id": user_id})
+        if not user_pref or "active_pdf_id" not in user_pref:
+            return None
+
+        # Get PDF metadata
+        try:
+            document = await self.get_pdf_metadata(user_pref["active_pdf_id"], user_id)
+            return {"document_id": user_pref["active_pdf_id"], "title": document.title}
+        except HTTPException:
+            # If the PDF no longer exists, clear the selection
+            await user_prefs.update_one({"user_id": user_id}, {"$unset": {"active_pdf_id": "", "active_pdf_title": ""}})
+            return None
+
+    async def get_pdf_text(self, document_id: str, user_id: int) -> str:
+        """
+        Get the text content of a PDF document
+
+        Args:
+            document_id: ID of the PDF document
+            user_id: ID of the user
+
+        Returns:
+            Text content of the PDF or empty string if not parsed
+        """
+        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
+        mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
+        pdf_texts = mongodb["pdf_texts"]
+
+        # Check if the PDF has been parsed
+        text_doc = await pdf_texts.find_one({"document_id": document_id, "user_id": user_id})
+        if not text_doc or "content" not in text_doc:
+            # If not parsed, try to parse it now
+            try:
+                parse_result = await self.parse_pdf_text(document_id, user_id)
+                return parse_result.get("content", "")
+            except HTTPException:
+                return ""
+
+        return text_doc["content"]

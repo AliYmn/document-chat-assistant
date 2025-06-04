@@ -1,9 +1,16 @@
-from fastapi import APIRouter, Depends, status, File, UploadFile, Form, HTTPException, Header
+from fastapi import APIRouter, Depends, status, File, UploadFile, Form, HTTPException, Header, Body
 from fastapi_limiter.depends import RateLimiter
 from typing import List, Annotated
 
-from pdf_service.api.v1.pdf.pdf_schemas import PDFUploadMetadata, PDFMetadataResponse
+from pdf_service.api.v1.pdf.pdf_schemas import (
+    PDFUploadMetadata,
+    PDFMetadataResponse,
+    ChatRequest,
+    ChatResponse,
+    ChatHistoryResponse,
+)
 from pdf_service.core.services.pdf_service import PDFService
+from pdf_service.core.services.ai_service import AIService
 from libs.service.auth import AuthService
 from libs.db import get_async_db
 from libs.db.mongodb import get_async_mongodb
@@ -24,6 +31,11 @@ async def get_pdf_service(db: AsyncSession = Depends(get_async_db)) -> PDFServic
 def get_auth_service(db: AsyncSession = Depends(get_async_db)) -> AuthService:
     """Dependency for authentication service"""
     return AuthService(db)
+
+
+def get_ai_service(db: AsyncSession = Depends(get_async_db)) -> AIService:
+    """Dependency for AI service"""
+    return AIService(db)
 
 
 @router.post("/pdf-upload", response_model=PDFMetadataResponse, status_code=status.HTTP_201_CREATED)
@@ -127,3 +139,53 @@ async def select_pdf(
     """
     user = await auth_service.get_user_from_token(authorization)
     return await pdf_service.select_pdf_for_chat(document_id, user.id)
+
+
+@router.post("/pdf-chat", response_model=ChatResponse)
+async def chat_with_pdf(
+    chat_request: ChatRequest = Body(...),
+    authorization: Annotated[str | None, Header()] = None,
+    pdf_service: PDFService = Depends(get_pdf_service),
+    ai_service: AIService = Depends(get_ai_service),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Send a message to chat with the currently selected PDF
+    """
+    user = await auth_service.get_user_from_token(authorization)
+
+    # Get the currently selected PDF
+    selected_pdf = await pdf_service.get_selected_pdf(user.id)
+    if not selected_pdf:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No PDF selected. Please select a PDF using /pdf-select endpoint first.",
+        )
+
+    # Get the PDF content
+    pdf_content = await pdf_service.get_pdf_text(selected_pdf["document_id"], user.id)
+    if not pdf_content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="PDF content not available. Please parse the PDF using /pdf-parse endpoint first.",
+        )
+
+    # Chat with the PDF
+    return await ai_service.chat_with_pdf(
+        user_id=user.id, message=chat_request.message, pdf_content=pdf_content, pdf_title=selected_pdf["title"]
+    )
+
+
+@router.get("/chat-history", response_model=ChatHistoryResponse)
+async def get_chat_history(
+    limit: int = 50,
+    authorization: Annotated[str | None, Header()] = None,
+    ai_service: AIService = Depends(get_ai_service),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Get the user's chat history
+    """
+    user = await auth_service.get_user_from_token(authorization)
+    history = await ai_service.get_chat_history(user.id, limit)
+    return {"history": history}
