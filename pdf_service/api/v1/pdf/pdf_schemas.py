@@ -1,6 +1,6 @@
+from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime
 
 
 class PDFUploadMetadata(BaseModel):
@@ -11,6 +11,17 @@ class PDFUploadMetadata(BaseModel):
     tags: Optional[List[str]] = Field(default_factory=list, description="Tags associated with the document")
     filename: str = Field(..., description="Original filename of the PDF")
     content_type: str = Field("application/pdf", description="Content type of the file")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "title": "Sample Document",
+                "description": "A sample PDF document",
+                "tags": ["sample", "document", "pdf"],
+                "filename": "sample.pdf",
+                "content_type": "application/pdf",
+            }
+        }
 
 
 class PDFMetadataResponse(BaseModel):

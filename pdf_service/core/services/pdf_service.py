@@ -1,17 +1,27 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from pdf_service.api.v1.pdf.pdf_schemas import PDFUploadMetadata, PDFMetadataResponse
-from datetime import datetime
-from libs.db.mongodb import get_async_mongodb
-from motor.motor_asyncio import AsyncIOMotorGridFSBucket
-from fastapi import UploadFile, HTTPException, status
 import io
+from datetime import datetime
+from typing import List, Dict, Any
+
 from bson import ObjectId
 import PyPDF2
-from typing import List, Dict, Any
+from fastapi import UploadFile, HTTPException, status
+from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from libs.db.mongodb import get_async_mongodb
+from pdf_service.api.v1.pdf.pdf_schemas import PDFUploadMetadata, PDFMetadataResponse
 
 
 class PDFService:
+    """Service for managing PDF documents with MongoDB GridFS"""
+
     def __init__(self, db: AsyncSession, mongodb=None):
+        """Initialize the PDF service
+
+        Args:
+            db: SQL database session
+            mongodb: MongoDB database connection
+        """
         self.db = db
         self.mongodb = mongodb
 
@@ -30,7 +40,7 @@ class PDFService:
             Metadata of the uploaded PDF file
         """
         # Use MongoDB database connection from constructor or get a new one if not provided
-        # Can't use 'or' with MongoDB objects as they don't implement truth value testing
+        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
         mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
 
         # Create GridFS bucket
@@ -92,7 +102,7 @@ class PDFService:
         Returns:
             Metadata of the PDF document
         """
-        # Can't use 'or' with MongoDB objects as they don't implement truth value testing
+        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
         mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
         metadata_collection = mongodb["pdf_metadata"]
 
@@ -125,7 +135,7 @@ class PDFService:
         Returns:
             List of PDF document metadata
         """
-        # Can't use 'or' with MongoDB objects as they don't implement truth value testing
+        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
         mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
         metadata_collection = mongodb["pdf_metadata"]
 
@@ -153,7 +163,7 @@ class PDFService:
         Returns:
             Dictionary with deletion status
         """
-        # Can't use 'or' with MongoDB objects as they don't implement truth value testing
+        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
         mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
         metadata_collection = mongodb["pdf_metadata"]
 
@@ -191,7 +201,7 @@ class PDFService:
         Returns:
             Dictionary with text content and metadata
         """
-        # Can't use 'or' with MongoDB objects as they don't implement truth value testing
+        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
         mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
         metadata_collection = mongodb["pdf_metadata"]
 
@@ -250,7 +260,7 @@ class PDFService:
         document = await self.get_pdf_metadata(document_id, user_id)
 
         # Store the selection in a user preferences collection
-        # Can't use 'or' with MongoDB objects as they don't implement truth value testing
+        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
         mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
         user_prefs = mongodb["user_preferences"]
 

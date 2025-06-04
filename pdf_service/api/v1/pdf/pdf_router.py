@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, status, File, UploadFile, Form, HTTPException, Header
-from typing import List
 from fastapi_limiter.depends import RateLimiter
-from typing import Annotated
+from typing import List, Annotated
 
 from pdf_service.api.v1.pdf.pdf_schemas import PDFUploadMetadata, PDFMetadataResponse
 from pdf_service.core.services.pdf_service import PDFService
@@ -17,11 +16,13 @@ router = APIRouter(
 
 
 async def get_pdf_service(db: AsyncSession = Depends(get_async_db)) -> PDFService:
+    """Dependency for PDF service with MongoDB connection"""
     mongodb = await get_async_mongodb()
     return PDFService(db=db, mongodb=mongodb)
 
 
 def get_auth_service(db: AsyncSession = Depends(get_async_db)) -> AuthService:
+    """Dependency for authentication service"""
     return AuthService(db)
 
 
