@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, status, File, UploadFile, Form, HTTPException, Header, Body
+from fastapi import APIRouter, Depends, status, File, UploadFile, Form, Header, Body
+from libs.exceptions.schemas import ExceptionBase
+from libs.exceptions.errors import ErrorCode
 from fastapi_limiter.depends import RateLimiter
 from typing import List, Annotated
 
@@ -56,7 +58,7 @@ async def upload_pdf(
 
     # Validate file content type
     if not file.content_type or "pdf" not in file.content_type.lower():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only PDF files are allowed")
+        raise ExceptionBase(ErrorCode.BAD_REQUEST)
 
     # Parse tags if provided
     tag_list = tags.split(",") if tags else []
@@ -157,18 +159,12 @@ async def chat_with_pdf(
     # Get the currently selected PDF
     selected_pdf = await pdf_service.get_selected_pdf(user.id)
     if not selected_pdf:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No PDF selected. Please select a PDF using /pdf-select endpoint first.",
-        )
+        raise ExceptionBase(ErrorCode.BAD_REQUEST)
 
     # Get the PDF content
     pdf_content = await pdf_service.get_pdf_text(selected_pdf["document_id"], user.id)
     if not pdf_content:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="PDF content not available. Please parse the PDF using /pdf-parse endpoint first.",
-        )
+        raise ExceptionBase(ErrorCode.BAD_REQUEST)
 
     # Chat with the PDF
     return await ai_service.chat_with_pdf(
