@@ -1,0 +1,518 @@
+{
+	"info": {
+		"_postman_id": "5e9a9b0a-fac1-446a-a309-3cdb6a37499f",
+		"name": "Document Chat Assistant",
+		"description": "Authentication service endpoints for user management and authentication",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25145460"
+	},
+	"item": [
+		{
+			"name": "Auth Service",
+			"item": [
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{auth_url}}/api/v1/auth/me",
+							"host": [
+								"{{auth_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"me"
+							]
+						},
+						"description": "Get the current user's profile information"
+					},
+					"response": []
+				},
+				{
+					"name": "Register User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\",\n  \"first_name\": \"Test\",\n  \"last_name\": \"User\"\n}"
+						},
+						"url": {
+							"raw": "{{auth_url}}/api/v1/auth/register",
+							"host": [
+								"{{auth_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Register a new user"
+					},
+					"response": []
+				},
+				{
+					"name": "Request Password Reset",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{user_email}}\"\n}"
+						},
+						"url": {
+							"raw": "{{auth_url}}/api/v1/auth/password-reset/request",
+							"host": [
+								"{{auth_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"password-reset",
+								"request"
+							]
+						},
+						"description": "Request a password reset email"
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"password\": \"NewPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{auth_url}}/api/v1/auth/password-reset/RESET_TOKEN_HERE",
+							"host": [
+								"{{auth_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"password-reset",
+								"RESET_TOKEN_HERE"
+							]
+						},
+						"description": "Reset password using the token from the email"
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.environment.set(\"access_token\", jsonData.access_token);",
+									"pm.environment.set(\"refresh_token\", jsonData.refresh_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{auth_url}}/api/v1/auth/refresh-token",
+							"host": [
+								"{{auth_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"refresh-token"
+							]
+						},
+						"description": "Refresh the access token using the refresh token"
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.environment.set(\"access_token\", jsonData.access_token);",
+									"pm.environment.set(\"refresh_token\", jsonData.refresh_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{auth_url}}/api/v1/auth/login",
+							"host": [
+								"{{auth_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Login with email and password to get access and refresh tokens"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Pdf Service",
+			"item": [
+				{
+					"name": "Upload PDF",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"value": "",
+									"type": "file"
+								},
+								{
+									"key": "title",
+									"value": "Sample PDF Document",
+									"type": "text"
+								},
+								{
+									"key": "description",
+									"value": "This is a sample PDF document for testing",
+									"type": "text"
+								},
+								{
+									"key": "tags",
+									"value": "sample,test,pdf",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{pdf_url}}/api/v1/pdf-upload",
+							"host": [
+								"{{pdf_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"pdf-upload"
+							]
+						},
+						"description": "Upload a PDF file to MongoDB using GridFS"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete PDF",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{pdf_url}}/api/v1/pdf/68409caf3caf5a6467f1429f",
+							"host": [
+								"{{pdf_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"pdf",
+								"68409caf3caf5a6467f1429f"
+							]
+						},
+						"description": "Delete a PDF document and its metadata"
+					},
+					"response": []
+				},
+				{
+					"name": "Parse PDF",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{pdf_url}}/api/v1/pdf-parse?document_id=6840aec1b94e430e96519c04",
+							"host": [
+								"{{pdf_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"pdf-parse"
+							],
+							"query": [
+								{
+									"key": "document_id",
+									"value": "6840aec1b94e430e96519c04"
+								}
+							]
+						},
+						"description": "Extract text content from a PDF document"
+					},
+					"response": []
+				},
+				{
+					"name": "Select PDF for Chat",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{pdf_url}}/api/v1/pdf-select?document_id=6840aec1b94e430e96519c04",
+							"host": [
+								"{{pdf_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"pdf-select"
+							],
+							"query": [
+								{
+									"key": "document_id",
+									"value": "6840aec1b94e430e96519c04"
+								}
+							]
+						},
+						"description": "Select a PDF for chat by setting it as the active document"
+					},
+					"response": []
+				},
+				{
+					"name": "Get PDF Metadata",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{pdf_url}}/api/v1/pdf/6840aec1b94e430e96519c04",
+							"host": [
+								"{{pdf_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"pdf",
+								"6840aec1b94e430e96519c04"
+							]
+						},
+						"description": "Get metadata for a specific PDF document"
+					},
+					"response": []
+				},
+				{
+					"name": "Chat with PDF",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"message\": \"Can you summarize that?\"\n}"
+						},
+						"url": {
+							"raw": "{{pdf_url}}/api/v1/pdf-chat",
+							"host": [
+								"{{pdf_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"pdf-chat"
+							]
+						},
+						"description": "Send a message to chat with the currently selected PDF. Requires a PDF to be selected first using the /pdf-select endpoint and the PDF content to be parsed using the /pdf-parse endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "List PDFs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{pdf_url}}/api/v1/pdf-list?skip=0&limit=10",
+							"host": [
+								"{{pdf_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"pdf-list"
+							],
+							"query": [
+								{
+									"key": "skip",
+									"value": "0"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "List all PDF files for the current user with pagination"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Chat History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{access_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{pdf_url}}/api/v1/chat-history?limit=50",
+							"host": [
+								"{{pdf_url}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"chat-history"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "50",
+									"description": "Maximum number of messages to return"
+								}
+							]
+						},
+						"description": "Get the user's chat history with pagination."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}
