@@ -9,6 +9,7 @@ from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from libs.db.mongodb import get_async_mongodb
+from libs.logger import get_logger
 from pdf_service.api.v1.pdf.pdf_schemas import PDFUploadMetadata, PDFMetadataResponse
 
 
@@ -24,6 +25,7 @@ class PDFService:
         """
         self.db = db
         self.mongodb = mongodb
+        self.logger = get_logger("pdf_service.service")
 
     async def upload_pdf_to_gridfs(
         self, file: UploadFile, metadata: PDFUploadMetadata, user_id: int
@@ -39,6 +41,13 @@ class PDFService:
         Returns:
             Metadata of the uploaded PDF file
         """
+        self.logger.info(
+            "Uploading PDF to GridFS",
+            filename=metadata.filename,
+            user_id=user_id,
+            file_size=file.size if hasattr(file, "size") else "unknown",
+        )
+
         # Use MongoDB database connection from constructor or get a new one if not provided
         # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
         mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
@@ -49,6 +58,7 @@ class PDFService:
         # Read file content
         content = await file.read()
         file_size = len(content)
+        self.logger.debug("Read file content", actual_file_size=file_size)
 
         # Prepare file metadata
         file_metadata = {
@@ -63,21 +73,30 @@ class PDFService:
             },
         }
 
-        # Upload file to GridFS
-        file_id = await fs.upload_from_stream(metadata.filename, io.BytesIO(content), metadata=file_metadata)
+        try:
+            # Upload file to GridFS
+            grid_id = await fs.upload_from_stream(
+                filename=metadata.filename,
+                source=io.BytesIO(content),
+                metadata=file_metadata,
+            )
+            self.logger.debug("File uploaded to GridFS", grid_id=str(grid_id))
 
-        # Store metadata in a separate collection for efficient querying
-        pdf_metadata = {
-            "grid_fs_id": file_id,
-            "title": metadata.title,
-            "description": metadata.description,
-            "tags": metadata.tags or [],
-            "filename": metadata.filename,
-            "user_id": user_id,
-            "file_size": file_size,
-            "upload_date": datetime.now(),
-            "content_type": metadata.content_type,
-        }
+            # Create metadata document in the PDF metadata collection
+            pdf_metadata = {
+                "grid_fs_id": grid_id,
+                "filename": metadata.filename,
+                "title": metadata.title,
+                "description": metadata.description,
+                "user_id": user_id,
+                "file_size": file_size,
+                "upload_date": datetime.utcnow(),
+                "parsed": False,
+                "text_content": None,
+            }
+        except Exception as e:
+            self.logger.error("Failed to upload file to GridFS", error=str(e))
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to upload PDF file")
 
         # Insert metadata into the pdf_metadata collection
         metadata_collection = mongodb["pdf_metadata"]
@@ -93,18 +112,22 @@ class PDFService:
 
     async def get_pdf_metadata(self, document_id: str, user_id: int) -> PDFMetadataResponse:
         """
-        Get metadata for a specific PDF document
+        Get PDF metadata by document ID
 
         Args:
             document_id: ID of the PDF document
-            user_id: ID of the user requesting the document
+            user_id: ID of the user requesting the metadata
 
         Returns:
             Metadata of the PDF document
+
+        Raises:
+            HTTPException: If the document is not found or doesn't belong to the user
         """
-        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
+        self.logger.info("Getting PDF metadata", document_id=document_id, user_id=user_id)
+
+        # Get MongoDB connection
         mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
-        metadata_collection = mongodb["pdf_metadata"]
 
         try:
             # Convert string ID to ObjectId
@@ -113,10 +136,29 @@ class PDFService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid document ID format")
 
         # Find document with matching ID and user_id
+        metadata_collection = mongodb["pdf_metadata"]
         document = await metadata_collection.find_one({"_id": obj_id, "user_id": user_id})
 
+        # Check if document exists
         if not document:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+            self.logger.warning("PDF document not found", document_id=document_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="PDF document not found",
+            )
+
+        # Check if document belongs to the user
+        if document["user_id"] != user_id:
+            self.logger.warning(
+                "Unauthorized access attempt to PDF document",
+                document_id=document_id,
+                requested_by_user_id=user_id,
+                owner_user_id=document["user_id"],
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to access this document",
+            )
 
         # Convert ObjectId to string for response
         document["id"] = str(document.pop("_id"))
@@ -135,7 +177,9 @@ class PDFService:
         Returns:
             List of PDF document metadata
         """
-        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
+        self.logger.info("Listing user PDFs", user_id=user_id, skip=skip, limit=limit)
+
+        # Get MongoDB connection
         mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
         metadata_collection = mongodb["pdf_metadata"]
 
@@ -152,20 +196,24 @@ class PDFService:
 
         return documents
 
-    async def delete_pdf(self, document_id: str, user_id: int) -> Dict[str, Any]:
+    async def delete_pdf(self, document_id: str, user_id: int) -> bool:
         """
         Delete a PDF document and its metadata
 
         Args:
             document_id: ID of the PDF document to delete
-            user_id: ID of the user requesting deletion
+            user_id: ID of the user requesting the deletion
 
         Returns:
-            Dictionary with deletion status
+            True if the document was deleted successfully
+
+        Raises:
+            HTTPException: If the document is not found or doesn't belong to the user
         """
-        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
+        self.logger.info("Deleting PDF document", document_id=document_id, user_id=user_id)
+
+        # Get MongoDB connection
         mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
-        metadata_collection = mongodb["pdf_metadata"]
 
         try:
             # Convert string ID to ObjectId
@@ -174,34 +222,53 @@ class PDFService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid document ID format")
 
         # Find document with matching ID and user_id
+        metadata_collection = mongodb["pdf_metadata"]
         document = await metadata_collection.find_one({"_id": obj_id, "user_id": user_id})
 
         if not document:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-        # Get GridFS bucket
+        # Create GridFS bucket
         fs = AsyncIOMotorGridFSBucket(mongodb)
 
-        # Delete file from GridFS
-        await fs.delete(document["grid_fs_id"])
+        try:
+            # Delete file from GridFS
+            await fs.delete(document["grid_fs_id"])
+            self.logger.debug("File deleted from GridFS", grid_id=str(document["grid_fs_id"]))
 
-        # Delete metadata
-        await metadata_collection.delete_one({"_id": obj_id})
+            # Delete metadata from MongoDB collection
+            result = await metadata_collection.delete_one({"_id": ObjectId(document_id)})
 
-        return {"status": "success", "message": "Document deleted successfully"}
+            if result.deleted_count > 0:
+                self.logger.info("PDF document deleted successfully", document_id=document_id)
+                return True
+            else:
+                self.logger.warning("Failed to delete PDF metadata", document_id=document_id)
+                return False
 
-    async def parse_pdf_text(self, document_id: str, user_id: int) -> Dict[str, Any]:
+        except Exception as e:
+            self.logger.error("Error deleting PDF document", document_id=document_id, error=str(e))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete PDF document"
+            )
+
+    async def parse_pdf_text(self, document_id: str, user_id: int) -> bool:
         """
-        Extract text content from a PDF document
+        Parse text content from a PDF document and store it in the metadata
 
         Args:
-            document_id: ID of the PDF document
-            user_id: ID of the user requesting parsing
+            document_id: ID of the PDF document to parse
+            user_id: ID of the user requesting the parsing
 
         Returns:
-            Dictionary with text content and metadata
+            True if the document was parsed successfully
+
+        Raises:
+            HTTPException: If the document is not found or doesn't belong to the user
         """
-        # Get MongoDB connection (can't use 'or' operator with MongoDB objects)
+        self.logger.info("Parsing PDF text", document_id=document_id, user_id=user_id)
+
+        # Get MongoDB connection
         mongodb = self.mongodb if self.mongodb is not None else await get_async_mongodb()
         metadata_collection = mongodb["pdf_metadata"]
 

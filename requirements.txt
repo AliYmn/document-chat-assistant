@@ -1,6 +1,6 @@
 fastapi[all]==0.115.12
 uvicorn[standard]==0.34.3
-aiohttp[speedups]==3.12.7
+aiohttp[speedups]==3.12.9
 SQLAlchemy==2.0.41
 celery==5.5.3
 alembic==1.16.1
@@ -24,8 +24,11 @@ redis==6.2.0
 requests==2.32.3
 fastapi-limiter==0.1.6
 openai==1.84.0
-boto3==1.38.29
+boto3==1.38.30
 sentry-sdk==2.29.1
-motor==3.4.0
-pymongo==4.6.3
-PyPDF2==3.0.0
+motor==3.7.1
+pymongo==4.13.0
+PyPDF2==3.0.1
+structlog==25.4.0
+python-json-logger==3.3.0
+rich==14.0.0
