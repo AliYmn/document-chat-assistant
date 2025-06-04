@@ -229,6 +229,40 @@ For specific test files:
 make test-file FILE=tests/unit/pdf_service/core/services/test_ai_service.py
 ```
 
+## 🔍 Postman Collection
+
+A comprehensive Postman collection is included in the repository to help you test and interact with the API endpoints.
+
+### How to Use the Postman Collection
+
+1. Import the `postman_collection.json` file into Postman
+2. Create an environment with the following variables:
+   - `auth_url`: URL for the Auth Service (e.g., `http://localhost:8000`)
+   - `pdf_url`: URL for the PDF Service (e.g., `http://localhost:8001`)
+   - `user_email`: Your test user email
+   - `user_password`: Your test user password
+
+### Available Requests
+
+#### Auth Service
+- Register User
+- Login (automatically sets access_token and refresh_token in your environment)
+- Get Current User
+- Refresh Token
+- Request Password Reset
+- Reset Password
+
+#### PDF Service
+- Upload PDF
+- List PDFs
+- Get PDF Metadata
+- Parse PDF
+- Select PDF for Chat
+- Chat with PDF
+- Get Chat History
+
+The collection includes pre-configured request bodies and authentication headers, making it easy to test the API functionality.
+
 ## 🔍 Known Issues and Limitations
 
 1. The Gemini API has rate limits that may affect chat functionality during heavy usage.
