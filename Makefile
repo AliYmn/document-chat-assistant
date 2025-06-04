@@ -48,6 +48,28 @@ run-debug:
 	docker compose -f docker-compose.local.yml run --rm --service-ports $$SERVICE
 
 #-----------------------------------------------
+# 🧪 Testing Commands
+#-----------------------------------------------
+
+# 🧪 Run all tests
+test:
+	python -m pytest tests/ -v
+
+# 🧪 Run unit tests only
+test-unit:
+	python -m pytest tests/unit/ -v
+
+# 🧪 Run specific test file
+test-file:
+	@echo '🔍 Enter test file path (e.g., tests/unit/pdf_service/core/services/test_ai_service.py): '; \
+	read TEST_FILE; \
+	python -m pytest $$TEST_FILE -v
+
+# 🧪 Run tests with coverage report
+test-coverage:
+	python -m pytest tests/ --cov=. --cov-report=term --cov-report=html
+
+#-----------------------------------------------
 # 🗄️ Database Migration Commands
 #-----------------------------------------------
 
