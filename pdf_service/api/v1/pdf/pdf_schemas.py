@@ -3,26 +3,25 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 
-# PDF Document schemas
-class PDFDocumentBase(BaseModel):
-    """Base model for PDF Document data"""
+class PDFUploadMetadata(BaseModel):
+    """Metadata for uploaded PDF files"""
 
     title: str = Field(..., description="Title of the PDF document")
     description: Optional[str] = Field(None, description="Description of the PDF document")
-    tags: Optional[List[str]] = Field(None, description="Tags associated with the document")
-    language: Optional[str] = Field("en", description="Language of the document")
-    page_count: Optional[int] = Field(None, description="Number of pages in the document")
-    file_size: Optional[int] = Field(None, description="Size of the file in bytes")
+    tags: Optional[List[str]] = Field(default_factory=list, description="Tags associated with the document")
+    filename: str = Field(..., description="Original filename of the PDF")
+    content_type: str = Field("application/pdf", description="Content type of the file")
 
 
-class PDFDocumentResponse(PDFDocumentBase):
-    """Response model for PDF Document data"""
+class PDFMetadataResponse(BaseModel):
+    """Response model for PDF metadata"""
 
-    id: int
-    user_id: int
-    file_path: str
-    created_date: datetime
-    updated_date: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+    id: str = Field(..., description="MongoDB document ID")
+    title: str = Field(..., description="Title of the PDF document")
+    description: Optional[str] = Field(None, description="Description of the PDF document")
+    tags: List[str] = Field(default_factory=list, description="Tags associated with the document")
+    filename: str = Field(..., description="Original filename of the PDF")
+    user_id: int = Field(..., description="ID of the user who uploaded the document")
+    file_size: int = Field(..., description="Size of the file in bytes")
+    upload_date: datetime = Field(..., description="Upload timestamp")
+    content_type: str = Field(..., description="Content type of the file")

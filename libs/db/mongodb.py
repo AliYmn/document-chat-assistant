@@ -13,8 +13,11 @@ from libs import settings
 
 
 # MongoDB connection clients
-async_client = AsyncIOMotorClient(settings.MONGO_URI)
-sync_client = MongoClient(settings.MONGO_URI)
+# MongoDB 7.0 için kimlik doğrulama veritabanını belirten bağlantı URI'si oluştur
+auth_source = f"mongodb://{settings.MONGO_USER}:{settings.MONGO_PASSWORD}@{settings.MONGO_HOST}:{settings.MONGO_PORT}/{settings.MONGO_DB}?authSource=admin"
+
+async_client = AsyncIOMotorClient(auth_source)
+sync_client = MongoClient(auth_source)
 
 
 # Async MongoDB functions
